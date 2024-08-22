@@ -1,13 +1,14 @@
 import re
+import sys
 import logging
 import requests
 from selenium import webdriver
-from flask import Flask, render_template
-from flask import request, Response, stream_with_context
+from flask import Flask
+from flask import Response, stream_with_context
 from selenium.webdriver.common.by import By
 
 current_stream = None
-app = Flask("uhdmovies.dad")
+app = Flask(__name__)
 
 options = webdriver.ChromeOptions()
 options.add_argument('--headless')
@@ -55,26 +56,20 @@ def fetch_stream_infos(driveleech_url):
 
   return r.json()
 
-@app.route("/settings", methods=["GET", "POST"])
-def control_panel():
-  global current_stream
-  if request.method == "GET":
-    return render_template("index.html")
-  elif request.method == "POST":
-    '''
-      URL should be something like
-      https://tech.unblockedgames.world/?sid=<ID>
-    '''
-    driveleech_url = bypass_shortener(request.form['url'])
-    stream_infos = fetch_stream_infos(driveleech_url)
-    current_stream = stream_infos['url']
-    logger.info('[+] Correctly updated stream url')
-    return Response(status=200)
-
 @app.get("/stream")
 def stream():
   logger.info('[!] Started streaming of url ' + current_stream)
   res = requests.get(current_stream, stream=True)
   return Response(stream_with_context(res.iter_content(4096)), content_type=res.headers['content-type'])
 
-app.run('0.0.0.0', port=3000, debug=True)
+if __name__ == "__main__":
+  if len(sys.argv) < 2:
+    print("[x] You should provide a valid url")
+    exit(-1)
+  
+  driveleech_url = bypass_shortener(sys.argv[1])
+  stream_infos = fetch_stream_infos(driveleech_url)
+  current_stream = stream_infos['url']
+
+  app.run('0.0.0.0', port=3000, debug=True, use_reloader=False)
+  exit(0)
